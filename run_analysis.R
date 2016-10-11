@@ -64,7 +64,7 @@ run_analysis <- function() {
     gather (sensor, reading, 1:73) %>%
     group_by(activity, subject, sensor) %>%
     summarize(avg_reading=mean(reading)) %>%
-    # spread (variable, avg) %>% I like it tall and skinny (normalized) but if you want, you could spread() it back out
+    # spread (sensor, avg) %>% I like it tall and skinny (normalized) but if you want, you could spread() it back out
     return
 }
 
