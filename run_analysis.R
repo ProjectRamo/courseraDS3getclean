@@ -1,72 +1,72 @@
-# Merges the training and the test sets to create one data set.
-# Extracts only the measurements on the mean and standard deviation for each measurement.
-# Uses descriptive activity names to name the activities in the data set
-# Appropriately labels the data set with descriptive variable names.
-# From the data set in step 4, creates a second, independent tidy data set with the average of each variable for each activity and each subject
+# This script is supposed to perform the following:
+# 1. Merges the training and the test sets to create one data set.
+# 2. Extracts only the measurements on the mean and standard deviation for each measurement.
+# 3. Uses descriptive activity names to name the activities in the data set
+# 4. Appropriately labels the data set with descriptive variable names.
+# 5. From the data set in step 4, creates a second, independent tidy data set with the average of each variable for each activity and each subject
+
+# However, changing the order makes it easier, so we will actually do
+
+library(dplyr)
+library(tidyr)
 
 run_analysis <- function() {
+  # I prefer to have the data set in a different directory but the course calls for same directory.
+  # This function helps me toggle quickly
+  addpath <- function(filename) {
+    path = "UCI HAR Dataset/"
+    path="" # remove for my home laptop
+    return(paste0(path, filename))
+  }
   
+  # Note that sep="" which means that all consecutive white spaces are joined together. This made a big difference.
+  # Initially I was getting many extra features (columns) and observations (rows) because each double space generated
+  # a new feature.
+  # We know the number of observations should equal the rows of y_train and features equal the rows of features.txt
+  
+  activity_labels <- read.csv(addpath("activity_labels.txt"), header = FALSE, stringsAsFactors=FALSE, sep="")
+  features <- read.csv(addpath("features.txt"), header = FALSE, stringsAsFactors=FALSE, sep="")
+  
+  
+  x_train <- read.csv(addpath("train/X_train.txt"), header = FALSE, sep="")
+  y_train <-read.csv(addpath("train/y_train.txt"), header = FALSE, sep="")
+  subject_train <- read.csv(addpath("train/subject_train.txt"), header = FALSE, stringsAsFactors=FALSE, sep="")
+  
+  x_test <- read.csv(addpath("test/X_test.txt"), header = FALSE, sep="")
+  y_test <- read.csv(addpath("test/y_test.txt"), header = FALSE, sep="")
+  subject_test <- read.csv(addpath("test/subject_test.txt"), header = FALSE, stringsAsFactors=FALSE, sep="")
+  
+  # give them the appropriate labels
+  featurelist <- features$V2
+  colnames(x_test) = featurelist
+  colnames(x_train) = featurelist
+  
+  # fortunately we can merge the labels pretty easily because y_test and activity_labels index on "v1"
+  # lets merge on activity and store the activity label in a new column called "activity"
+  x_test$activity = (merge(y_test, activity_labels) %>% mutate(activity=V2))$activity # %>% select(activity) won't work
+  x_train$activity = (merge(y_train, activity_labels) %>% mutate(activity=V2))$activity
+  
+  # add the subject id too because we will eventually need it
+  # the subject stays anonymous so we never merge the label on
+  x_train$subject = subject_train$V1
+  x_test$subject = subject_test$V1
+  
+  # merge the test and train data now that activity has been added
+  x_test_train <- rbind.data.frame(x_train, x_test)
+  
+  # Let's extract all the columns which feature the word "std" or "mean(" we need the \\ so that ( doesn't read as a special char
+  valid_colnames <- make.names(names=names(x_test_train), unique=TRUE, allow_ = TRUE)
+  names(x_test_train) <- valid_colnames # without this, I get duplicate names because the "-" doesnt distinguish the names properly
+  x_test_train = select(x_test_train, matches("std|mean\\.|activity|subject"))
+  
+  # Finally make the new dataframe by gathering the varialbe names, summarizing it and displaying
+  x_test_train %>%
+    gather (sensor, reading, 1:73) %>%
+    group_by(activity, subject, sensor) %>%
+    summarize(avg_reading=mean(reading)) %>%
+    # spread (variable, avg) %>% I like it tall and skinny (normalized) but if you want, you could spread() it back out
+    return
 }
 
-# I prefer to have the data set in a different directory but the course calls for same directory.
-# This function helps me toggle quickly
-addpath <- function(filename) {
-  path = "UCI HAR Dataset/"
-  path="" # remove or replace usually
-  return(paste0(path, filename))
-}
-
-
-activity_labels <- read.csv(addpath("activity_labels.txt"), header = FALSE, sep="")
-features <- read.csv(addpath("features.txt"), header = FALSE, stringsAsFactors=FALSE, sep="")
-
-subject_train <- read.csv(addpath("train/subject_train.txt"), header = FALSE, sep="")
-
-y_train <-read.csv(addpath("train/y_train.txt"), header = FALSE, sep="")
-x_train <- read.csv(addpath("train/X_train.txt"), header = FALSE, sep="")
-
-x_test <- read.csv(addpath("test/X_test.txt"), header = FALSE, sep="")
-y_test <- read.csv(addpath("test/y_test.txt"), header = FALSE, sep="")
-
-
-
-x_tt <- rbind(x_train, x_test)
-
-
-# Not that sep="" which means that all consecutive white spaces are joined together. This made a big difference.
-# Initially I was getting many extra features (columns) and observations (rows) because each double space generated
-# a new feature.
-
-# We know the number of observations should equal the rows of y_train and features equal the rows of features.txt
-
-# Okay so what is in the subject file?
-summary(subject_train)
-# X1       
-# Min.   : 1.00  
-# 1st Qu.: 8.00  
-# Median :19.00  
-# Mean   :17.42  
-# 3rd Qu.:26.00 
-# This goes from 1-30 so I think it is an id for each subject (there were 30 people who participated)
-
-# What is in the y_train file?
-summary(y_train)
-# X5       
-# Min.   :1.000  
-# 1st Qu.:2.000  
-# Median :4.000  
-# Mean   :3.643  
-# 3rd Qu.:5.000  
-# Max.   :6.000  
-
-# This looks like the number of the activity since it goes from 1-6 
-
-# let's label the x_train data
-head(features[[2]])
-colnames(x_train) = features[[2]]
-X_train$subjectID = subject_train
-X_train$activityID = y_train
-
-
-# label the y_train and y_test by the appropriate activity
-
+output <- run_analysis()
+write.table(output, file="run_analysis_output.txt", row.name=FALSE)
